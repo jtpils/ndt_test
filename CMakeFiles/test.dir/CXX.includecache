@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ayukawa/Documents/research/demo/ndt_test/test.cpp
+iostream
+-
+fstream
+-
+boost/tokenizer.hpp
+-
+boost/lexical_cast.hpp
+-
+
