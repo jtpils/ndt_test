@@ -2,58 +2,45 @@
 #include <iostream>
 #include <fstream>
 
-using namespace std;
-
-string filename = "../data/frame_3.pcd";
-string f_type = "pcd";
-double resolution = 1.0;
-
 int main(int argc, char** argv)
 {
+	using namespace std;
 	fstream ofile;
-	std::vector<points> ayuge, transformed_ayuge;
-	loadFile(filename, ayuge, f_type);
-	// if(argc != 4){
-	// 	cerr << "<exe> <init x> <init y> <init theta>(on build dir)" << endl;
-	// 	return -1;
-	// }
-	double min_x, min_y, max_x, max_y;
-	estimateBB2d(ayuge, min_x, min_y, max_x, max_y);
-
-    //番号振り分け
-	for(int i = 0; i < ayuge.size(); i++){
-		int x_number = (int)( (ayuge.at(i).x_pos - min_x) / resolution );
-		int y_number = (int)( (ayuge.at(i).y_pos - min_y) / resolution );
-		ayuge.at(i).xIdx = x_number;
-		ayuge.at(i).yIdx = y_number;
-	}
-
-    //データを一旦ylabelの情報を元にソートするよ
-	sort(ayuge.begin(), ayuge.end(), 
-		 [](const points& lhs, const points& rhs)->bool
-		 { return lhs.y_pos < rhs.y_pos; });
+	string target_file = "../data/data2.txt";
+	string input_file = "../data/data1_rot_1.txt";
 	
-	cerr << "ylabelのsortしたの？" << endl;
-	int min_y_id = ayuge.at(0).yIdx;
-	int x_start = 0;
-	for (int i = 0; i < ayuge.size(); i++){
-		if(min_y_id < ayuge.at(i).yIdx){
-			int x_end = i;
-			sort(&ayuge.at(x_start), &ayuge.at(x_end), 
-				 [](const points& lhs, const points& rhs)->bool
-				 { return lhs.x_pos < rhs.x_pos; });
-			min_y_id = ayuge.at(i).yIdx;
-			x_start = i;
-		}
+	string f_type = "txt";
+	double resolution = 1.0;
+    //target data読み込み
+	std::vector<points> target_data;
+    loadFile(target_file, target_data, f_type);
+    //番号振り分け
+	double min_x, min_y, max_x, max_y;
+	estimateBB2d(target_data, min_x, min_y, max_x, max_y);
+	for(int i = 0; i < target_data.size(); i++){
+		int x_number = (int)( (target_data.at(i).x_pos - min_x) / resolution );
+		int y_number = (int)( (target_data.at(i).y_pos - min_y) / resolution );
+		target_data.at(i).xIdx = x_number;
+		target_data.at(i).yIdx = y_number;
 	}
 
-	sort(&ayuge.at(x_start), &ayuge.at( ayuge.size()-1 ), 
-		 [](const points& lhs, const points& rhs)->bool
-		 { return lhs.x_pos < rhs.x_pos; });
+    //input data読み込み
+	std::vector<points> input_data;
+	loadFile(input_file, input_data, f_type);
+    //番号振り分け
+	double min_x_input, min_y_input, max_x_input, max_y_input;
+	estimateBB2d(input_data, min_x_input, min_y_input, max_x_input, max_y_input);
+	for(int i = 0; i < input_data.size(); i++){
+		int x_number = (int)( (input_data.at(i).x_pos - min_x_input) / resolution );
+		int y_number = (int)( (input_data.at(i).y_pos - min_y_input) / resolution );
+		input_data.at(i).xIdx = x_number;
+		input_data.at(i).yIdx = y_number;
+	}
 
-	cerr << "xlabelのsortしたの？" << endl;
-	// for (int i = 0; i < ayuge.size(); i++)
-	// 	cerr << "[" << i << "] (" << ayuge.at(i).x_pos << "," << ayuge.at(i).y_pos << "," << ayuge.at(i).xIdx << "," << ayuge.at(i).yIdx << ")" << endl;
+	cerr << "after sorting (target data)" << std::endl;
+	data_sorting(target_data);
+	cerr << "after sorting (input data)" << std::endl;
+	data_sorting(input_data);
 
     //グリッド的なもののサイズ
 	double x_size_f = (max_x - min_x) / resolution;
@@ -61,151 +48,65 @@ int main(int argc, char** argv)
 	double y_size_f = (max_y - min_y) / resolution;
 	int y_size = (int)y_size_f;
 
-    //init
-	int map[y_size][x_size];
-	for(int i = 0; i < y_size; i++)
-		for(int j = 0; j < x_size; j++)
-			map[i][j] = 0;
+    //local_inputをどのように動かせばいいか求めるニキ
+	double delta_p[3]; //移動量
+	double score;
+	double tolerance = 0.001;
+	int max_loop = 1000;
+	double sum_vec_g[2];
+	double sum_mat_h[3][3];
 
-	for(int i = 0; i < ayuge.size(); i++){
-		map[ayuge.at(i).yIdx][ayuge.at(i).xIdx]++;
+    // for(int i = 0; i < y_size+1; i++){
+	// 	for(int j = 0; j < x_size+1; j++){
+	for(int i = 0; i < 1; i++){
+		for(int j = 0; j < 1; j++){
+			//i,jのIdを持つ点群をピックアップ
+			cerr << "[" << i << "][" << j << "]" << endl;
+			std::vector<points> local_target;
+			for(int n = 0; n < target_data.size(); n++)
+				if( (target_data.at(n).yIdx == i) && (target_data.at(n).xIdx == j) )
+					local_target.push_back(target_data.at(n));
+
+			//i,jのIdを持つ入力点群をピックアップ
+			std::vector<points> local_input;
+			for(int n = 0; n < input_data.size(); n++)
+				if( (input_data.at(n).yIdx == i) && (input_data.at(n).xIdx == j) )
+					local_input.push_back(input_data.at(n));
+
+            //求めるお？
+			cerr << "local_target.size():" << local_target.size() << endl;
+			cerr << "local_input.size():" << local_input.size() << endl;
+
+            //許容範囲に達するか、回数回すかでそいやそいや
+			estimateTransform(local_target, local_input, delta_p, tolerance, max_loop, score);
+
+			cerr << "apply ndt matching[" << i << "][" << j << "]" << endl;
+			cerr << "delta p(tx):" << delta_p[0] << endl;
+			cerr << "delta p(ty):" << delta_p[1] << endl;
+			cerr << "delta p(theta):" << delta_p[2] << endl;
+			cerr << "score:" << score << endl;
+
+		}
 	}
 
-	int max_value = -999;
-	for(int i = 0; i < y_size; i++)
-		for(int j = 0; j < x_size; j++)
-			if(max_value < map[i][j]) max_value = map[i][j];
+    //参照データを表示
+	std::cerr << "****結果発表****" << std::endl;
+	std::cerr << ">>>>>>参照データ" << std::endl;
+	for(int i = 0; i < target_data.size(); i++){
+		std::cerr << target_data.at(i).x_pos << " " << target_data.at(i).y_pos << std::endl;
+	}
 
-	// cerr << "max value:" << max_value << endl;
-	// cv::Mat cv_mat(y_size, x_size, CV_16U);
-	// for(int i = 0; i < y_size; i++)
-	// 	for(int j = 0; j < x_size; j++)
-	// 		cv_mat.at<unsigned short>(i, j) = map[i][j];
+    //入力データを表示
+	std::cerr << ">>>>>>入力データ" << std::endl;
+	for(int i = 0; i < input_data.size(); i++){
+		std::cerr << input_data.at(i).x_pos << " " << input_data.at(i).y_pos << std::endl;
+	}
 
-	// cv::imshow("test", cv_mat);
-	// cv::waitKey();
-
-	// fstream output_file;
-	// output_file.open("../data/2d_map.txt", ios::out);
-	// for(int i = 0; i < y_size; i++)
-	// 	for(int j = 0; j < x_size; j++)
-	// 		output_file << i << " " << j << " " << map[i][j] << std::endl;
-	// output_file.close();
-
-// 	double init_x = atof(argv[1]);
-// 	double init_y = atof(argv[2]);
-// 	double init_theta = atof(argv[3]);
-// 	cerr << "p (" << init_x << "," << init_y << "," << init_theta << ")" << endl; 
-// 	for (int i = 0; i < ayuge.size(); i++){
-// 		points trans_pt;
-// 		transformPoint(ayuge.at(i), init_theta, init_x, init_y, trans_pt);
-// 		transformed_ayuge.push_back(trans_pt);
-// 	}
-
-// 	points mean_pt, mean_pt2;
-// 	estimateMean(mean_pt, ayuge);
-// 	estimateMean(mean_pt2, transformed_ayuge);
-  
-// 	double mat[2][2], mat2[2][2];
-// 	estimateCovarianceMat(mat, ayuge, mean_pt);
-// 	estimateCovarianceMat(mat2, transformed_ayuge, mean_pt2);
-
-// 	double inv_mat[2][2], inv_mat2[2][2];
-// 	estimateInvMat(inv_mat, mat);
-// 	estimateInvMat(inv_mat2, mat2);
-
-// 	ofile.open("../data/output.txt", ios::out);
-// 	for(double x = -1.0; x < 2.0; x+= 0.01)
-// 		for (double y = -1.0; y < 2.0; y+= 0.01){
-// 			points input_pt;
-// 			input_pt.x_pos = x;
-// 			input_pt.y_pos = y;
-// 			double output_data = estimateProb(input_pt, inv_mat, mean_pt);
-// 			ofile << x << " " << y << " " << output_data << std::endl;
-// 		}
-// 	ofile.close();
-// 	double score_base = estimateScore(ayuge, mean_pt, mat);
-
-// 	ofile.open("../data/output_transform.txt", ios::out);
-// 	for(double x = -1.0; x < 2.0; x+= 0.01)
-// 		for (double y = -2.0; y < 2.0; y+= 0.01){
-// 			points input_pt;
-// 			input_pt.x_pos = x;
-// 			input_pt.y_pos = y;
-// 			double output_data = estimateProb(input_pt, inv_mat2, mean_pt2);
-// 			ofile << x << " " << y << " " << output_data << std::endl;
-// 		}
-// 	ofile.close();
-// 	double score_trans = estimateScore(transformed_ayuge, mean_pt, mat);
-
-// //transformed_ayugeに対するdelta_p を求める
-// 	double delta_p[3];
-// 	double sum_of_vec_g[2] = {0, 0};
-// 	double sum_of_mat_h[3][3] ={ {0, 0, 0},
-// 								 {0, 0, 0},
-// 								 {0, 0, 0} };
-// 	for (int index = 0; index < transformed_ayuge.size(); index++){
-// 		//cerr << "[[" << index << "]](" << transformed_ayuge.at(index).x_pos << "," << transformed_ayuge.at(index).y_pos << ")" << endl;
-//       //estimate g
-// 		double vector_g[2];
-// 		estimateVecG(transformed_ayuge.at(index), 0.0, mean_pt, mat, vector_g);
-// 		sum_of_vec_g[0] += vector_g[0];
-// 		sum_of_vec_g[1] += vector_g[1];
-//       //estimate H
-// 		double mat_h[3][3];
-// 		estimateMatH(transformed_ayuge.at(index), 0.0, mean_pt, mat, mat_h);
-// 		for(int i = 0; i < 3; i++)
-// 			for (int j = 0; j < 3; j++)
-// 				sum_of_mat_h[i][j] += mat_h[i][j];
-// 	}
-// 	for(int i = 0; i < 3; i++)
-// 		for(int j = 0; j < 3; j++)
-// 			cerr << "hessian[" << i << "][" << j<< "]=" << sum_of_mat_h[i][j] << endl;
-// 	double inv_h[3][3];
-// 	estimateInvMat3d(sum_of_mat_h, inv_h);
-// 	cerr << inv_h[0][0] << endl;
-// 	bool definite = determineDefinite(inv_h);
-
-// 	multiMV3d(inv_h, sum_of_vec_g, delta_p);
-// 	for (int i = 0; i < 3; i++)
-// 		delta_p[i] = -delta_p[i];
-
-// 	cerr << "apply ndt" << endl;
-// 	double new_p[3] = {(delta_p[2]*180.0/M_PI + init_theta), (delta_p[0] + init_x), (delta_p[1] + init_y)};
-//     cerr << "delta p(tx):" << delta_p[0] << endl;
-// 	cerr << "delta p(ty):" << delta_p[1] << endl;
-// 	cerr << "delta p(theta):" << delta_p[2]*180.0/M_PI << endl;
-//     cerr << "new p (" << new_p[0] << "," << new_p[1] << "," << new_p[2] << ")" << endl;
-	
-
-// //ndt result
-// 	std::vector<points> transformed_ndt;
-// 	for (int i = 0; i < ayuge.size(); i++){
-// 		points trans_pt;
-// 		transformPoint(ayuge.at(i), (delta_p[2]*180.0/M_PI + init_theta), (delta_p[0] + init_x), (delta_p[1] + init_y), trans_pt);
-// 		transformed_ndt.push_back(trans_pt);
-// 	}
-// 	points mean_ndt;
-// 	estimateMean(mean_ndt, transformed_ndt);
-// 	double cov_mat_ndt[2][2];
-// 	estimateCovarianceMat(cov_mat_ndt, transformed_ndt, mean_ndt);
-// 	double inv_mat_ndt[2][2];
-// 	estimateInvMat(inv_mat_ndt, cov_mat_ndt);
-// 	ofile.open("../data/ndt_result.txt", ios::out);
-// 	for(double x = -1.0; x < 2.0; x+= 0.01)
-// 		for (double y = -2.0; y < 2.0; y+= 0.01){
-// 			points input_pt;
-// 			input_pt.x_pos = x;
-// 			input_pt.y_pos = y;
-// 			double output_data = estimateProb(input_pt, inv_mat_ndt, mean_ndt);
-// 			ofile << x << " " << y << " " << output_data << std::endl;
-// 		}
-// 	ofile.close();
-// 	double result = estimateScore(transformed_ndt, mean_pt, mat);
-// 	cerr << "source score:" << score_base << endl;
-// 	cerr << "init score:" << score_trans << endl;
-// 	cerr << "after ndt score:" << result << endl;
+    //入力データtransformしたやつを表示
+	std::cerr << ">>>>>>入力データ（回転）" << std::endl;
+	for(int i = 0; i < input_data.size(); i++){
+		points transformed;
+		transformPoint(input_data.at(i), delta_p[2], delta_p[0], delta_p[1], transformed);
+		std::cerr << transformed.x_pos << " " << transformed.y_pos << std::endl;
+	}
 }
-
-
-

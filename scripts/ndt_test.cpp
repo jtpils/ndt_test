@@ -69,6 +69,37 @@ void estimateBB2d(std::vector<points> data, double& min_x, double& min_y, double
 	cerr << "(" << min_x << "," << min_y << ") (" << max_x << "," << max_y << ")" << endl;
 }
 
+void data_sorting(std::vector<points>& target_data)
+{
+    //データを一旦y座標の情報を元にソートするよ
+	sort(target_data.begin(), target_data.end(), 
+		 [](const points& lhs, const points& rhs)->bool
+		 { return lhs.y_pos < rhs.y_pos; });
+	
+	int min_y_id = target_data.at(0).yIdx;
+	int x_start = 0;
+	for (int i = 0; i < target_data.size(); i++){
+        //id_切り替わり時にx座標の情報をもとにソート
+		if(min_y_id < target_data.at(i).yIdx){
+			int x_end = i;
+			sort(&target_data.at(x_start), &target_data.at(x_end), 
+				 [](const points& lhs, const points& rhs)->bool
+				 { return lhs.x_pos < rhs.x_pos; });
+            //最低idの更新
+			min_y_id = target_data.at(i).yIdx;
+			x_start = i;
+		}
+	}
+	sort(&target_data.at(x_start), &target_data.at( target_data.size()-1 ), 
+		 [](const points& lhs, const points& rhs)->bool
+		 { return lhs.x_pos < rhs.x_pos; });
+
+	cerr << "sortしたの？" << endl;
+	for (int i = 0; i < target_data.size(); i++)
+		cerr << "[" << i << "] (" << target_data.at(i).x_pos << "," << target_data.at(i).y_pos << "," << target_data.at(i).xIdx << "," << target_data.at(i).yIdx << ")" << endl;
+}
+
+
 //vec * mat = 1*2
 void multiVtM(double vec[2], double mat[2][2], double vec_h[2])
 {
@@ -171,8 +202,10 @@ double estimateProb(points pt, double inv_mat[2][2], points mean_pt)
 void transformPoint(points source, double theta, double trans_x, double trans_y, points& out_put)
 {
 	double transform_matrix[2][2];
-	transform_matrix[0][0] = cos(theta * M_PI /180.0);
-	transform_matrix[0][1] = -sin(theta * M_PI /180.0);
+	//transform_matrix[0][0] = cos(theta * M_PI /180.0);
+	//transform_matrix[0][1] = -sin(theta * M_PI /180.0);
+	transform_matrix[0][0] = cos(theta);//rad
+	transform_matrix[0][1] = -sin(theta);//rad
 	transform_matrix[1][0] = -transform_matrix[0][1];
 	transform_matrix[1][1] = transform_matrix[0][0];
 	out_put.x_pos = transform_matrix[0][0] * source.x_pos + transform_matrix[0][1] * source.y_pos + trans_x;
@@ -206,7 +239,7 @@ void estimateVecG(points pt, double theta, points mean_pt, double cov_mat[2][2],
 {
 //contents of exp
 	double vec_qit[2];
-	vec_qit[0] = mean_pt.x_pos; vec_qit[1] = mean_pt.y_pos;
+	vec_qit[0] = pt.x_pos - mean_pt.x_pos; vec_qit[1] = pt.y_pos - mean_pt.y_pos;
 	double buf_vec[2];
 	double inv_mat[2][2];
 	estimateInvMat(inv_mat, cov_mat);
@@ -227,7 +260,7 @@ void estimateMatH(points pt, double theta, points mean_pt, double cov_mat[2][2],
 	double jacov[2][3];
 	estimateJacov(pt, theta, jacov);
 	double vec_qi[2];
-	vec_qi[0] = mean_pt.x_pos; vec_qi[1] = mean_pt.y_pos;
+	vec_qi[0] = pt.x_pos - mean_pt.x_pos; vec_qi[1] = pt.y_pos - mean_pt.y_pos;
 	double buf_vec[2];
 	double inv_mat[2][2];
 	estimateInvMat(inv_mat, cov_mat);
@@ -299,5 +332,106 @@ bool determineDefinite(double mat[3][3])
 	else{
 		cerr << "正定ではない(1st stage false)" << endl;
 		return false;
+	}
+}
+
+void estimateTransform(std::vector<points>& target_local, std::vector<points>& input_local, double param[DIM+1], double tolerance, int max_cicle, double score)
+{
+	cerr << "local_target.size():" << target_local.size() << endl;
+	cerr << "local_input.size():" << input_local.size() << endl;
+
+	//平均を求めるお
+	points mean_pt;
+	estimateMean(mean_pt, target_local);
+
+	//共分散行列を求めるお
+	double mat[DIM][DIM];
+	estimateCovarianceMat(mat, target_local, mean_pt);
+	
+	//共分散行列の逆行列
+	double inv_mat[DIM][DIM];
+	estimateInvMat(inv_mat, mat);
+	
+	//出力ファイル(なぞ分布)
+	// fstream file;
+	// string output_file("../data/output_");
+	// file.open(output_file + to_string(i) + to_string(j) + ".txt", ios::out);
+	// for(double x = -1.0; x < 1.0; x+= 0.01)
+	// 	for (double y = -1.0; y < 1.0; y+= 0.01){
+	// 		points input_pt;
+	// 		input_pt.x_pos = x;
+	// 		input_pt.y_pos = y;
+	// 		double output_data = estimateProb(input_pt, inv_mat, mean_pt);
+	// 		file << x << " " << y << " " << output_data << std::endl;
+	// 	}
+	// file.close();
+	
+	double sum_vec_g[2];
+	double sum_mat_h[3][3];
+
+	if (input_local.size() <= 3){
+		cerr << " entry few points cource..." << endl;
+		for (int i = 0; i < DIM+1; i++)
+			param[i] = 999;
+		score = -999;
+	}
+
+	else {
+		cerr << " entry normal cource..." << endl;
+		for(int i = 0; i < max_cicle; i++){
+            //gとhを求める
+			for (int index = 0; index < input_local.size(); index++){		
+				//estimate g
+				double vector_g[2];
+				estimateVecG(input_local.at(index), 0.0, mean_pt, mat, vector_g);
+				//add g
+				sum_vec_g[0] += vector_g[0];
+				sum_vec_g[1] += vector_g[1];
+
+				//estimate H
+				double mat_h[3][3];
+				estimateMatH(input_local.at(index), 0.0, mean_pt, mat, mat_h);
+				
+				//add H
+				for(int i = 0; i < 3; i++){
+					for (int j = 0; j < 3; j++)
+						sum_mat_h[i][j] += mat_h[i][j];
+				}
+			}
+			
+			//cerr << "vec_g:" << sum_vec_g[0] << " " << sum_vec_g[1] << endl;
+			// cerr << "hessian:" << endl;
+			// for(int i = 0; i < 3; i++){
+			// 	for(int j = 0; j < 3; j++){
+			// 		cerr << " " << sum_mat_h[i][j];
+			// 	}
+			// 	cerr << endl;
+			// }
+			
+			if(-tolerance < sum_vec_g[0] && sum_vec_g[0] <tolerance)
+				if(-tolerance < sum_vec_g[1] && sum_vec_g[1] <tolerance){
+					std::cerr << "tolerance clear g = (" << sum_vec_g[0] << ", " << sum_vec_g[1] << ")" << std::endl;
+					break;
+				}
+
+			double inv_h[3][3];
+			estimateInvMat3d(sum_mat_h, inv_h);
+			//bool definite = determineDefinite(inv_h);
+			
+            //変化量を求めるニキ
+			multiMV3d(inv_h, sum_vec_g, param);
+			param[0] = -param[0];
+			param[1] = -param[1];
+			param[2] = -param[2];
+
+            //input_localを変換
+			for(int i = 0; i < input_local.size(); i++)
+				transformPoint(input_local.at(i), param[2], param[0], param[1], input_local.at(i));
+			
+			score = estimateScore(input_local, mean_pt, mat);
+
+			if(i == max_cicle)
+				std::cerr << "converged!!" << std::endl;
+		}		
 	}
 }
