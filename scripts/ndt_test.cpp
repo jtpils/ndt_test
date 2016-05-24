@@ -221,7 +221,6 @@ double estimateScore(std::vector<points>& data, points mean_pt, double cov_mat[2
 		double prob = estimateProb(data.at(i), inv_mat, mean_pt);
 		result += prob;
 	}
-	//cerr << "score:" << result << endl;
 	return result;
 }
 
@@ -276,8 +275,8 @@ void estimateMatH(points pt, double theta, points mean_pt, double cov_mat[2][2],
 			double pi_pm[2] = {jacov[0][j], jacov[1][j]};
 			double pipi_pnpm[2];
 			if(i == 2 && j == 2){
-				pipi_pnpm[0] = -pt.x_pos * cos(theta * M_PI /180.0) + pt.y_pos * sin(theta * M_PI /180.0);
-				pipi_pnpm[1] = -pt.x_pos * sin(theta * M_PI /180.0) - pt.y_pos * cos(theta * M_PI /180.0);
+				pipi_pnpm[0] = -pt.x_pos * cos(theta) + pt.y_pos * sin(theta);
+				pipi_pnpm[1] = -pt.x_pos * sin(theta) - pt.y_pos * cos(theta);
 			}
 			else{
 				pipi_pnpm[0] = 0.0;
@@ -294,7 +293,6 @@ void estimateMatH(points pt, double theta, points mean_pt, double cov_mat[2][2],
 			mat_h[i][j] = ( ( -multiVtV(buf_vec, pi_pn) ) * ( -multiVtV(buf_vec, pi_pm) )
 							- multiVtV(buf_vec, pipi_pnpm) //n=m=3以外では0
 							- multiVtV(buf_vec2, pi_pn) ) * exp(contents);
-			//cerr << "h(" << i << "," << j << ")=" << mat_h[i][j] << endl;
 		}
 	}
 }
@@ -343,29 +341,30 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 	//平均を求めるお
 	points mean_pt;
 	estimateMean(mean_pt, target_local);
+	cerr << "mean pt: " << mean_pt.x_pos << ", " << mean_pt.y_pos << std::endl;
 
 	//共分散行列を求めるお
 	double mat[DIM][DIM];
 	estimateCovarianceMat(mat, target_local, mean_pt);
-	
-	//共分散行列の逆行列
-	double inv_mat[DIM][DIM];
-	estimateInvMat(inv_mat, mat);
-	
-	//出力ファイル(なぞ分布)
-	// fstream file;
-	// string output_file("../data/output_");
-	// file.open(output_file + to_string(i) + to_string(j) + ".txt", ios::out);
-	// for(double x = -1.0; x < 1.0; x+= 0.01)
-	// 	for (double y = -1.0; y < 1.0; y+= 0.01){
-	// 		points input_pt;
-	// 		input_pt.x_pos = x;
-	// 		input_pt.y_pos = y;
-	// 		double output_data = estimateProb(input_pt, inv_mat, mean_pt);
-	// 		file << x << " " << y << " " << output_data << std::endl;
-	// 	}
-	// file.close();
-	
+	cerr << "cov mat:" << endl;
+	for(int i = 0; i < 2; i++){
+		for(int j = 0; j < 2; j++){
+			cerr << " " << mat[i][j];
+		}
+		cerr << endl;
+	}
+
+	//共分散行列を求めるお
+	double inv_mat_test[DIM][DIM];
+	estimateInvMat(inv_mat_test, mat);
+	cerr << "inv cov mat:" << endl;
+	for(int i = 0; i < 2; i++){
+		for(int j = 0; j < 2; j++){
+			cerr << " " << inv_mat_test[i][j];
+		}
+		cerr << endl;
+	}
+
 	double sum_vec_g[2];
 	double sum_mat_h[3][3];
 
@@ -399,6 +398,17 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 				}
 			}
 			
+			if(i == 0){
+				cerr << "hessian:" << endl;
+				for(int i = 0; i < 3; i++){
+					for(int j = 0; j < 3; j++){
+						cerr << " " << sum_mat_h[i][j];
+					}
+					cerr << endl;
+				}
+				determineDefinite(sum_mat_h);
+			}
+
 			//cerr << "vec_g:" << sum_vec_g[0] << " " << sum_vec_g[1] << endl;
 			// cerr << "hessian:" << endl;
 			// for(int i = 0; i < 3; i++){
@@ -430,8 +440,8 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 			
 			score = estimateScore(input_local, mean_pt, mat);
 
-			if(i == max_cicle)
-				std::cerr << "converged!!" << std::endl;
+			if(i == max_cicle - 1)
+				std::cerr << "converged!!(" << max_cicle << ")" << std::endl;
 		}		
 	}
 }

@@ -7,7 +7,7 @@ int main(int argc, char** argv)
 	using namespace std;
 	fstream ofile;
 	string target_file = "../data/data2.txt";
-	string input_file = "../data/data1_rot_1.txt";
+	string input_file = "../data/data2_simple_trans.txt";
 	
 	string f_type = "txt";
 	double resolution = 1.0;
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 	double delta_p[3]; //移動量
 	double score;
 	double tolerance = 0.001;
-	int max_loop = 1000;
+	int max_loop = 100000;
 	double sum_vec_g[2];
 	double sum_mat_h[3][3];
 
@@ -78,7 +78,8 @@ int main(int argc, char** argv)
 			cerr << "local_input.size():" << local_input.size() << endl;
 
             //許容範囲に達するか、回数回すかでそいやそいや
-			estimateTransform(local_target, local_input, delta_p, tolerance, max_loop, score);
+			//estimateTransform(local_target, local_input, delta_p, tolerance, max_loop, score);
+			estimateTransform(target_data, input_data, delta_p, tolerance, max_loop, score);
 
 			cerr << "apply ndt matching[" << i << "][" << j << "]" << endl;
 			cerr << "delta p(tx):" << delta_p[0] << endl;
@@ -90,23 +91,32 @@ int main(int argc, char** argv)
 	}
 
     //参照データを表示
-	std::cerr << "****結果発表****" << std::endl;
+	std::cerr << "****成績発表****" << std::endl;
 	std::cerr << ">>>>>>参照データ" << std::endl;
+	ofile.open("../data/target.txt", ios::out);
 	for(int i = 0; i < target_data.size(); i++){
-		std::cerr << target_data.at(i).x_pos << " " << target_data.at(i).y_pos << std::endl;
+		//std::cerr << target_data.at(i).x_pos << " " << target_data.at(i).y_pos << std::endl;
+		ofile << target_data.at(i).x_pos << " " << target_data.at(i).y_pos << std::endl;
 	}
+	ofile.close();
 
     //入力データを表示
 	std::cerr << ">>>>>>入力データ" << std::endl;
+	ofile.open("../data/input.txt", ios::out);
 	for(int i = 0; i < input_data.size(); i++){
-		std::cerr << input_data.at(i).x_pos << " " << input_data.at(i).y_pos << std::endl;
+		//std::cerr << input_data.at(i).x_pos << " " << input_data.at(i).y_pos << std::endl;
+		ofile << input_data.at(i).x_pos << " " << input_data.at(i).y_pos << std::endl;
 	}
+	ofile.close();
 
     //入力データtransformしたやつを表示
 	std::cerr << ">>>>>>入力データ（回転）" << std::endl;
+	ofile.open("../data/input_rot.txt", ios::out);
 	for(int i = 0; i < input_data.size(); i++){
 		points transformed;
 		transformPoint(input_data.at(i), delta_p[2], delta_p[0], delta_p[1], transformed);
-		std::cerr << transformed.x_pos << " " << transformed.y_pos << std::endl;
+		//std::cerr << transformed.x_pos << " " << transformed.y_pos << std::endl;
+		ofile << transformed.x_pos << " " << transformed.y_pos << std::endl;
 	}
+	ofile.close();
 }

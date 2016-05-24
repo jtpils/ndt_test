@@ -6,13 +6,9 @@
 
 #IncludeRegexTransform: 
 
-/home/ayukawa/Documents/research/demo/ndt_test/scripts/main.cpp
+/home/ayukawa/Documents/research/demo/ndt_test/scripts/ndt_test.cpp
 ndt_test.h
 /home/ayukawa/Documents/research/demo/ndt_test/scripts/ndt_test.h
-iostream
--
-fstream
--
 
 /home/ayukawa/Documents/research/demo/ndt_test/scripts/ndt_test.h
 iostream
