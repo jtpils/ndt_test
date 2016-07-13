@@ -202,8 +202,6 @@ double estimateProb(points pt, double inv_mat[2][2], points mean_pt)
 void transformPoint(points source, double theta, double trans_x, double trans_y, points& out_put)
 {
 	double transform_matrix[2][2];
-	//transform_matrix[0][0] = cos(theta * M_PI /180.0);
-	//transform_matrix[0][1] = -sin(theta * M_PI /180.0);
 	transform_matrix[0][0] = cos(theta);//rad
 	transform_matrix[0][1] = -sin(theta);//rad
 	transform_matrix[1][0] = -transform_matrix[0][1];
@@ -224,126 +222,175 @@ double estimateScore(std::vector<points>& data, points mean_pt, double cov_mat[2
 	return result;
 }
 
-void estimateJacov(points pt, double theta, double Jacov_mat[2][3])
+void estimateJacov(double Jacov_vec[2], points pt, double theta, int id)
 {
-	Jacov_mat[0][0] = 1;
-	Jacov_mat[0][1] = 0;
-	Jacov_mat[0][2] = -pt.x_pos * sin(theta * M_PI / 180.0) - pt.y_pos * cos(theta * M_PI /180.0);
-	Jacov_mat[1][0] = 0;
-	Jacov_mat[1][1] = 1;
-	Jacov_mat[1][2] = pt.x_pos * cos(theta * M_PI / 180.0) - pt.y_pos * sin(theta * M_PI /180.0);
+  if(id == 0){
+	Jacov_vec[0] = 1;
+	Jacov_vec[1] = 0;
+  }
+  else if(id == 1){
+	Jacov_vec[0] = 0;
+	Jacov_vec[1] = 1;
+  }
+  else if(id == 2){
+	Jacov_vec[0] = -pt.x_pos * sin(theta) - pt.y_pos * cos(theta);
+	Jacov_vec[1] = pt.x_pos * cos(theta) - pt.y_pos * sin(theta);
+  }
+  else{
+	std::cerr << "第四引数は0か1か2で頼む\n" << std::endl;
+  }
 }
 
-void estimateVecG(points pt, double theta, points mean_pt, double cov_mat[2][2], double vec_g[3])
+void estimateGradJacov(double GJacov_vec[2], points pt, double theta, int row_id, int column)
 {
-//contents of exp
-	double vec_qit[2];
-	vec_qit[0] = pt.x_pos - mean_pt.x_pos; vec_qit[1] = pt.y_pos - mean_pt.y_pos;
-	double buf_vec[2];
-	double inv_mat[2][2];
-	estimateInvMat(inv_mat, cov_mat);
-	multiVtM(vec_qit, inv_mat, buf_vec);
-
-	double contents = -multiVtV(buf_vec, vec_qit) / 2.0;
-	double jacov[2][3];
-	estimateJacov(pt, theta, jacov);
-
-	vec_g[0] = (buf_vec[0] * jacov[0][0] + buf_vec[1] * jacov[1][0]) * exp(contents);
-	vec_g[1] = (buf_vec[0] * jacov[0][1] + buf_vec[1] * jacov[1][1]) * exp(contents);
-	vec_g[2] = (buf_vec[0] * jacov[0][2] + buf_vec[1] * jacov[1][2]) * exp(contents);
-
+  if(row_id == 2 && column == 2){
+	GJacov_vec[0] = -pt.x_pos * cos(theta) + pt.y_pos * sin(theta);
+	GJacov_vec[1] = -pt.x_pos * sin(theta) - pt.y_pos * cos(theta);
+  }
+  else{
+	GJacov_vec[0] = 0.0;
+	GJacov_vec[1] = 0.0;
+  }
 }
 
-void estimateMatH(points pt, double theta, points mean_pt, double cov_mat[2][2], double mat_h[3][3])
+void estimateVecG(points pt, double transform_param[3], points mean_pt, double cov_inv_mat[2][2], double vec_g[3])
 {
-	double jacov[2][3];
-	estimateJacov(pt, theta, jacov);
-	double vec_qi[2];
-	vec_qi[0] = pt.x_pos - mean_pt.x_pos; vec_qi[1] = pt.y_pos - mean_pt.y_pos;
-	double buf_vec[2];
-	double inv_mat[2][2];
-	estimateInvMat(inv_mat, cov_mat);
-	multiVtM(vec_qi, inv_mat, buf_vec);
+  //transformed point と NDTのグリッドの重心との関係を求める
+  points pt_transformed;
+  transformPoint(pt, transform_param[2], transform_param[0], transform_param[1], pt_transformed);
+  points pt_relative;
+  pt_relative.x_pos = pt_transformed.x_pos - mean_pt.x_pos;
+  pt_relative.x_pos = pt_transformed.y_pos - mean_pt.y_pos;
 
-	double contents = -multiVtV(buf_vec, vec_qi) / 2.0;
-// mat_h[0][0]
-// dq/dp0 = {1, 0}
-// dq^2/dp0dp0 = {0, 0}
-	for(int i = 0; i < 3; i++){
-		for (int j = 0; j < 3; j++){
-			double pi_pn[2] = {jacov[0][i], jacov[1][i]};
-			double pi_pm[2] = {jacov[0][j], jacov[1][j]};
-			double pipi_pnpm[2];
-			if(i == 2 && j == 2){
-				pipi_pnpm[0] = -pt.x_pos * cos(theta) + pt.y_pos * sin(theta);
-				pipi_pnpm[1] = -pt.x_pos * sin(theta) - pt.y_pos * cos(theta);
-			}
-			else{
-				pipi_pnpm[0] = 0.0;
-				pipi_pnpm[1] = 0.0;
-			}
+  //jacov
+  double jacov[3][2];
+  estimateJacov(jacov[0], pt_relative, transform_param[2], 0);
+  estimateJacov(jacov[1], pt_relative, transform_param[2], 1);
+  estimateJacov(jacov[2], pt_relative, transform_param[2], 2);
 
-			// cerr << "[" << i << "][" << j << "]:" << endl 
-			// 	 << "  dpi/dpn:(" << pi_pn[0] << ", " << pi_pn[1] << ")" << endl 
-			// 	 << "  dpi/dpm:(" << pi_pm[0] << ", " << pi_pm[1] << ")" << endl 
-			// 	 << "  d^2pi/dpndpm:(" << pipi_pnpm[0] << ", " << pipi_pnpm[1] << ")" << endl;
+  //calcurate contents of exp
+  double pt_relative_v[2] = {pt_relative.x_pos, pt_relative.y_pos};
+  double buf_vec[2];
+  multiVtM(pt_relative_v, cov_inv_mat, buf_vec);
+  double contents = - multiVtV(buf_vec, pt_relative_v) / 2.0;
 
-			double buf_vec2[2];
-			multiVtM(pi_pm, inv_mat, buf_vec2);
-			mat_h[i][j] = ( ( -multiVtV(buf_vec, pi_pn) ) * ( -multiVtV(buf_vec, pi_pm) )
-							- multiVtV(buf_vec, pipi_pnpm) //n=m=3以外では0
-							- multiVtV(buf_vec2, pi_pn) ) * exp(contents);
-		}
+  //vec_gを求める
+  vec_g[0] = (buf_vec[0] * jacov[0][0] + buf_vec[1] * jacov[0][1]) * exp(contents);
+  vec_g[1] = (buf_vec[0] * jacov[1][0] + buf_vec[1] * jacov[1][1]) * exp(contents);
+  vec_g[2] = (buf_vec[0] * jacov[2][0] + buf_vec[1] * jacov[2][1]) * exp(contents);
+}
+
+void estimateMatH(points pt, double transform_param[3], points mean_pt, double cov_inv_mat[2][2], double mat_h[3][3])
+{
+  //transformed point と NDTのグリッドの重心との関係を求める
+  points pt_transformed;
+  transformPoint(pt, transform_param[2], transform_param[0], transform_param[1], pt_transformed);
+  points pt_relative;
+  pt_relative.x_pos = pt_transformed.x_pos - mean_pt.x_pos;
+  pt_relative.x_pos = pt_transformed.y_pos - mean_pt.y_pos;
+
+  //jacov
+  double jacov[3][2];
+  estimateJacov(jacov[0], pt_relative, transform_param[2], 0);
+  estimateJacov(jacov[1], pt_relative, transform_param[2], 1);
+  estimateJacov(jacov[2], pt_relative, transform_param[2], 2);
+
+  //calcurate contents of exp
+  double pt_relative_v[2] = {pt_relative.x_pos, pt_relative.y_pos};
+  double buf_vec[2]; //pt_relative * cov_inv_mat
+  multiVtM(pt_relative_v, cov_inv_mat, buf_vec);
+  double contents = - multiVtV(buf_vec, pt_relative_v) / 2.0;
+
+  //calcurate H
+  for(int i = 0; i < 3; i++){
+	for (int j = 0; j < 3; j++){
+	  double jacov_i[2] = {jacov[i][0], jacov[i][1]};
+	  double jacov_j[2] = {jacov[j][0], jacov[j][1]};
+	  double gjacov[2];
+	  estimateGradJacov(gjacov, pt_relative, transform_param[2], i, j);
+
+	  //pt_relative * cov_inv_mat
+	  double buf_vec2[2]; 
+	  multiMV(cov_inv_mat, jacov_i, buf_vec2);
+	  mat_h[i][j] = ( ( multiVtV(buf_vec, jacov_i) ) * ( -multiVtV(buf_vec, jacov_j) )
+					  - multiVtV(buf_vec, gjacov) //n=m=3以外では0
+					  - multiVtV(jacov_j, buf_vec2) ) * exp(contents);
 	}
+  }
+
+  //debug用表示
+  std::cerr << ">>>hesse calc..." << std::endl;
+  std::cerr << "pt: (" << pt.x_pos << ", " << pt.y_pos << ")" << std::endl;
+  std::cerr << "pt_trans: (" << pt_transformed.x_pos << ", " << pt_transformed.y_pos << ")" << std::endl;
+  std::cerr << "pt_relative: (" << pt_relative.x_pos << ", " << pt_relative.y_pos << ")" << std::endl;
+  std::cerr << "mean pt: (" << mean_pt.x_pos << ", " << mean_pt.y_pos << ")" << std::endl;
+  std::cerr << "jacov[0]: (" << jacov[0][0] << ", " << jacov[0][1] << ")" << std::endl;
+  std::cerr << "jacov[1]: (" << jacov[1][0] << ", " << jacov[1][1] << ")" << std::endl;
+  std::cerr << "jacov[2]: (" << jacov[2][0] << ", " << jacov[2][1] << ")" << std::endl;
+  std::cerr << "exp content:" << contents << std::endl;
+
 }
 
-bool determineDefinite(double mat[3][3])
+bool determineDefinite(double mat[3][3], double rambda)
 {
-	double det12 = mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0];
-	double det23 = mat[1][1] * mat[2][2] - mat[1][2] * mat[2][1];
-	double det123 = mat[0][0] * mat[1][1] * mat[2][2] 
-		+ mat[0][1] * mat[1][2] * mat[2][0]
-		+ mat[0][2] * mat[1][0] * mat[2][1]
-		- mat[0][0] * mat[1][2] * mat[2][1]
-		- mat[0][1] * mat[1][0] * mat[2][2]
-		- mat[0][2] * mat[1][1] * mat[2][0]; 
-	if(mat[0][0] >= 0){
-		if(det12 >= 0)
-			if(det23 >=0)
-				if(det123 >= 0){
-					cerr << "正定!!" << endl;
-					return true;
-				}
-				else{
-					cerr << "正定ではない(final stage false!)" << endl;
-					return false;
-				}
-			else{
-				cerr << "正定ではない(3rd stage false)" << endl;
-				return false;
-			}
+  double det12 = mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0];
+  double det23 = mat[1][1] * mat[2][2] - mat[1][2] * mat[2][1];
+  double det123 = mat[0][0] * mat[1][1] * mat[2][2] 
+	+ mat[0][1] * mat[1][2] * mat[2][0]
+	+ mat[0][2] * mat[1][0] * mat[2][1]
+	- mat[0][0] * mat[1][2] * mat[2][1]
+	- mat[0][1] * mat[1][0] * mat[2][2]
+	- mat[0][2] * mat[1][1] * mat[2][0]; 
+  if(mat[0][0] >= 0){
+	if(det12 >= 0)
+	  if(det23 >=0)
+		if(det123 >= 0){
+		  cerr << "正定!!" << endl;
+		  return true;
+		}
 		else{
-			cerr << "正定ではない(2nd stage false)" << endl;
-			return false;
+		  cerr << "正定ではない(final stage false!)" << endl;
+		  mat[0][0] += rambda;
+		  mat[1][1] += rambda;
+		  mat[2][2] += rambda;
+		  // determineDefinite(mat, rambda);
+		  return false;
 		}
-	}
-	else{
-		cerr << "正定ではない(1st stage false)" << endl;
+	  else{
+		cerr << "正定ではない(3rd stage false)" << endl;
+		mat[0][0] += rambda;
+		mat[1][1] += rambda;
+		mat[2][2] += rambda;
+		// determineDefinite(mat, rambda);
 		return false;
+	  }
+	else{
+	  cerr << "正定ではない(2nd stage false)" << endl;
+	  mat[0][0] += rambda;
+	  mat[1][1] += rambda;
+	  mat[2][2] += rambda;
+	  // determineDefinite(mat, rambda);
+	  return false;
 	}
+  }
+  else{
+	cerr << "正定ではない(1st stage false)" << endl;
+	mat[0][0] += rambda;
+	mat[1][1] += rambda;
+	mat[2][2] += rambda;
+	// determineDefinite(mat, rambda);
+	return false;
+  }
 }
 
 void estimateTransform(std::vector<points>& target_local, std::vector<points>& input_local, double param[DIM+1], double tolerance, int max_cicle, double score)
 {
-	cerr << "local_target.size():" << target_local.size() << endl;
-	cerr << "local_input.size():" << input_local.size() << endl;
-
-	//平均を求めるお
+	//平均を求めるお(target)
 	points mean_pt;
 	estimateMean(mean_pt, target_local);
 	cerr << "mean pt: " << mean_pt.x_pos << ", " << mean_pt.y_pos << std::endl;
 
-	//共分散行列を求めるお
+	//共分散行列を求めるお(target)
 	double mat[DIM][DIM];
 	estimateCovarianceMat(mat, target_local, mean_pt);
 	cerr << "cov mat:" << endl;
@@ -354,94 +401,95 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 		cerr << endl;
 	}
 
-	//共分散行列を求めるお
-	double inv_mat_test[DIM][DIM];
-	estimateInvMat(inv_mat_test, mat);
+	//共分散行列の逆行列を求めるお(target)
+	double inv_cov_mat[DIM][DIM];
+	estimateInvMat(inv_cov_mat, mat);
 	cerr << "inv cov mat:" << endl;
 	for(int i = 0; i < 2; i++){
 		for(int j = 0; j < 2; j++){
-			cerr << " " << inv_mat_test[i][j];
+			cerr << " " << inv_cov_mat[i][j];
 		}
 		cerr << endl;
 	}
 
-	double sum_vec_g[2];
-	double sum_mat_h[3][3];
+	double g_local[2];
+	double h_local[3][3];
 
 	if (input_local.size() <= 3){
-		cerr << " entry few points cource..." << endl;
-		for (int i = 0; i < DIM+1; i++)
-			param[i] = 999;
-		score = -999;
+	  cerr << " entry few points cource..." << endl;
+	  for (int i = 0; i < DIM+1; i++)
+		param[i] = 999;
+	  score = -999;
 	}
 
 	else {
-		cerr << " entry normal cource..." << endl;
-		for(int i = 0; i < max_cicle; i++){
-            //gとhを求める
-			for (int index = 0; index < input_local.size(); index++){		
-				//estimate g
-				double vector_g[2];
-				estimateVecG(input_local.at(index), 0.0, mean_pt, mat, vector_g);
-				//add g
-				sum_vec_g[0] += vector_g[0];
-				sum_vec_g[1] += vector_g[1];
-
-				//estimate H
-				double mat_h[3][3];
-				estimateMatH(input_local.at(index), 0.0, mean_pt, mat, mat_h);
-				
-				//add H
-				for(int i = 0; i < 3; i++){
-					for (int j = 0; j < 3; j++)
-						sum_mat_h[i][j] += mat_h[i][j];
-				}
+	  cerr << " entry normal cource..." << endl;
+	  for(int i = 0; i < max_cicle; i++){
+		std::cerr << i << "回目のループ" << std::endl;
+ 		//gとhを求める
+		for (int index = 0; index < input_local.size(); index++){		
+		  //estimate g
+		  double v_g[2];
+		  estimateVecG(input_local.at(index), param, mean_pt, inv_cov_mat, v_g);
+		  //add g
+		  g_local[0] += v_g[0];
+		  g_local[1] += v_g[1];
+		  
+		  //estimate H
+		  double mat_h[3][3];
+		  estimateMatH(input_local.at(index), param, mean_pt, inv_cov_mat, mat_h);
+		  //add H
+		  for(int i = 0; i < 3; i++){
+			for (int j = 0; j < 3; j++)
+			  h_local[i][j] += mat_h[i][j];
+		  }
+		}
+		
+		if(i == 0){
+		  // cerr << "hessian:" << endl;
+		  // for(int i = 0; i < 3; i++){
+		  // 	for(int j = 0; j < 3; j++){
+		  // 	  cerr << " " << h_local[i][j];
+		  // 	}
+		  // 	cerr << endl;
+		  // }
+		  determineDefinite(h_local, 1.0);
+		}
+		
+		//show g and H
+		std::cerr << "vec_g:" << g_local[0] << " " << g_local[1] << std::endl;
+		std::cerr << "hessian:" << std::endl;
+		for(int i = 0; i < 3; i++){
+			for(int j = 0; j < 3; j++){
+			  std::cerr << " " << h_local[i][j];
 			}
+			std::cerr << std::endl;
+		}
+		
+		// if(-tolerance < g_local[0] && g_local[0] <tolerance)
+		//   if(-tolerance < g_local[1] && g_local[1] <tolerance){
+		// 	std::cerr << "tolerance clear g = (" << g_local[0] << ", " << g_local[1] << ")" << std::endl;
+		// 	break;
+		//   }
+		
+		double inv_h[3][3];
+		estimateInvMat3d(h_local, inv_h);
+		//bool definite = determineDefinite(inv_h);
 			
-			if(i == 0){
-				cerr << "hessian:" << endl;
-				for(int i = 0; i < 3; i++){
-					for(int j = 0; j < 3; j++){
-						cerr << " " << sum_mat_h[i][j];
-					}
-					cerr << endl;
-				}
-				determineDefinite(sum_mat_h);
-			}
-
-			//cerr << "vec_g:" << sum_vec_g[0] << " " << sum_vec_g[1] << endl;
-			// cerr << "hessian:" << endl;
-			// for(int i = 0; i < 3; i++){
-			// 	for(int j = 0; j < 3; j++){
-			// 		cerr << " " << sum_mat_h[i][j];
-			// 	}
-			// 	cerr << endl;
-			// }
-			
-			if(-tolerance < sum_vec_g[0] && sum_vec_g[0] <tolerance)
-				if(-tolerance < sum_vec_g[1] && sum_vec_g[1] <tolerance){
-					std::cerr << "tolerance clear g = (" << sum_vec_g[0] << ", " << sum_vec_g[1] << ")" << std::endl;
-					break;
-				}
-
-			double inv_h[3][3];
-			estimateInvMat3d(sum_mat_h, inv_h);
-			//bool definite = determineDefinite(inv_h);
-			
-            //変化量を求めるニキ
-			multiMV3d(inv_h, sum_vec_g, param);
-			param[0] = -param[0];
-			param[1] = -param[1];
-			param[2] = -param[2];
-
-            //input_localを変換
-			for(int i = 0; i < input_local.size(); i++)
-				transformPoint(input_local.at(i), param[2], param[0], param[1], input_local.at(i));
-			
-			score = estimateScore(input_local, mean_pt, mat);
-
-			if(i == max_cicle - 1)
-				std::cerr << "converged!!(" << max_cicle << ")" << std::endl;
-		}		
+		//変化量を求めるニキ
+		multiMV3d(inv_h, g_local, param);
+		param[0] = -param[0];
+		param[1] = -param[1];
+		param[2] = -param[2];
+		
+		//input_localを変換
+		for(int i = 0; i < input_local.size(); i++)
+		  transformPoint(input_local.at(i), param[2], param[0], param[1], input_local.at(i));
+		
+		score = estimateScore(input_local, mean_pt, mat);
+		
+		if(i == max_cicle - 1)
+		  std::cerr << "converged!!(" << max_cicle << ")" << std::endl;
+	  }		
 	}
 }
