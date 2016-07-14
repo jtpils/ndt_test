@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <opencv2/core/core.hpp>
@@ -12,16 +13,23 @@
 
 struct points
 {
-	double x_pos;
-	double y_pos;
-	//double z_pos;
-	int xIdx;
-	int yIdx;
+  int index;
+  double x_pos;
+  double y_pos;
+};
+
+struct gridData
+{
+  int xIdx;
+  int yIdx;
+  int size;
+  points sum;
+  double temp_mat[2][2]; //x * xt
 };
 
 void loadFile(std::string filename, std::vector<points>& data, std::string file_type);
 void estimateBB2d(std::vector<points> data, double& min_x, double& min_y, double& max_x, double& max_y);
-void data_sorting(std::vector<points>& target_data);
+//void data_sorting(std::vector<points>& target_data);
 
 //行列演算用関数（掛け算）
 void multiVtM(double vec[DIM], double mat[DIM][DIM], double vec_h[DIM]);//1*2
@@ -30,8 +38,8 @@ void multiMV3d(double mat[DIM+1][DIM+1], double vec[DIM+1], double vec_v[DIM+1])
 double multiVtV(double vec_h[DIM], double vec_v[DIM]);
 
 //逆行列を求める関数
-void estimateInvMat(double inv_mat[DIM][DIM], double mat[DIM][DIM]);
-void estimateInvMat3d(double mat[DIM+1][DIM+1], double inv_mat[DIM+1][DIM+1]);
+bool estimateInvMat(double inv_mat[DIM][DIM], double mat[DIM][DIM]);
+bool estimateInvMat3d(double mat[DIM+1][DIM+1], double inv_mat[DIM+1][DIM+1]);
 
 //複数のポイントの重心を求める
 void estimateMean(points& mean_pt, std::vector<points>& data);
@@ -39,6 +47,7 @@ void estimateMean(points& mean_pt, std::vector<points>& data);
 //複数のポイントの共分散行列を求める
 void estimateCovarianceMat(double mat[DIM][DIM], std::vector<points>& data, points mean_pt);
 
+void saveNDT(std::vector<gridData> ndt_description, double min_x, double min_y, double max_x, double max_y);
 
 double estimateProb(points pt, double inv_mat[DIM][DIM], points mean_pt);
 double estimateScore(std::vector<points>& data, points mean_pt, double cov_mat[DIM][DIM]);
@@ -62,7 +71,7 @@ void estimateVecG(points pt, double transform_param[3], points mean_pt, double c
 
 //評価関数の勾配の勾配を求める関数
 //グリッド内の全点に適応してあとでvec_gを足してね
-void estimateMatH(points pt, double theta, points mean_pt, double cov_mat[DIM][DIM], double mat_h[DIM+1][DIM+1]);
+void estimateMatH(points pt, double transform_param[3], points mean_pt, double cov_inv_mat[2][2], double mat_h[3][3]);
 
 //行列が正定か判断する関数
 //正定でなかったら rambda * I を足しとくよ

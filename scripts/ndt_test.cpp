@@ -69,36 +69,81 @@ void estimateBB2d(std::vector<points> data, double& min_x, double& min_y, double
 	cerr << "(" << min_x << "," << min_y << ") (" << max_x << "," << max_y << ")" << endl;
 }
 
-void data_sorting(std::vector<points>& target_data)
+void saveNDT(std::vector<gridData> ndt_description, double min_x, double min_y, double max_x, double max_y)
 {
-    //データを一旦y座標の情報を元にソートするよ
-	sort(target_data.begin(), target_data.end(), 
-		 [](const points& lhs, const points& rhs)->bool
-		 { return lhs.y_pos < rhs.y_pos; });
-	
-	int min_y_id = target_data.at(0).yIdx;
-	int x_start = 0;
-	for (int i = 0; i < target_data.size(); i++){
-        //id_切り替わり時にx座標の情報をもとにソート
-		if(min_y_id < target_data.at(i).yIdx){
-			int x_end = i;
-			sort(&target_data.at(x_start), &target_data.at(x_end), 
-				 [](const points& lhs, const points& rhs)->bool
-				 { return lhs.x_pos < rhs.x_pos; });
-            //最低idの更新
-			min_y_id = target_data.at(i).yIdx;
-			x_start = i;
-		}
+  fstream ofile;
+  //NDTの様子を保存
+  int key = 0;
+  std::cerr << ">>>> NDT結果保存" << std::endl;
+  ofile.open("../data/NDT_result.plt", ios::out);
+  ofile << "reset" << std::endl;
+  stringstream func_list;
+  for(int i = 0; i < ndt_description.size(); i++){
+	if(ndt_description.at(i).size > 3){
+	  points grid_mean;
+	  grid_mean.x_pos = ndt_description.at(i).sum.x_pos / ndt_description.at(i).size;
+	  grid_mean.y_pos = ndt_description.at(i).sum.y_pos / ndt_description.at(i).size;
+	  //mean_pt * sum
+	  double mean_pt_v[2] = {grid_mean.x_pos, grid_mean.y_pos};
+	  double sum_v[2] = {ndt_description.at(i).sum.x_pos, ndt_description.at(i).sum.y_pos};
+	  double buf_mat[2][2];
+	  buf_mat[0][0] = mean_pt_v[0] * sum_v[0];
+	  buf_mat[0][1] = mean_pt_v[0] * sum_v[1];
+	  buf_mat[1][0] = mean_pt_v[1] * sum_v[0];
+	  buf_mat[1][1] = mean_pt_v[1] * sum_v[1];
+	  double cov[2][2] = 
+		{ { (ndt_description.at(i).temp_mat[0][0] - buf_mat[0][0]) / ndt_description.at(i).size ,
+			(ndt_description.at(i).temp_mat[0][1] - buf_mat[0][1]) / ndt_description.at(i).size},
+		  { (ndt_description.at(i).temp_mat[1][0] - buf_mat[1][0]) / ndt_description.at(i).size ,
+			(ndt_description.at(i).temp_mat[1][1] - buf_mat[1][1]) / ndt_description.at(i).size } };
+	  double inv_cov[2][2];
+	  estimateInvMat(inv_cov, cov);
+	  
+	  //plt 書き込み
+	  /*
+		i(x,y) = exp(-((7204.8 * (x-(8.01099)) * (x-(8.01099))) \
+		+(-173.735 * (x-(8.01099)) * (y-(-26.6039)))			\
+		+(-173.735 * (x-(8.01099)) * (y-(-26.6039)))			\
+		+(7.59913 * (y-(-26.6039)) * (y-(-26.6039)))) / 2)
+	  */
+	  //関数用意
+	  stringstream func_name, x_diff, y_diff;
+	  func_name << "func_" << i << "(x,y)";
+	  x_diff << "(x-(" << mean_pt_v[0] << "))";
+	  y_diff << "(y-(" << mean_pt_v[1] << "))";
+	  //関数描画
+	  ofile << func_name.str() 
+			<< "="
+			<< "exp(-("
+			<< "(" << inv_cov[0][0] << "*" << x_diff.str() << "*" << x_diff.str() << ")\\" << std::endl
+			<< "+(" << inv_cov[0][1] << "*" << x_diff.str() << "*" << y_diff.str() << ")\\" << std::endl
+			<< "+(" << inv_cov[1][0] << "*" << x_diff.str() << "*" << y_diff.str() << ")\\" << std::endl
+			<< "+(" << inv_cov[1][1] << "*" << y_diff.str() << "*" << y_diff.str() << ")) / 2)"
+			<< std::endl;
+
+	  //func_list
+	  if(key == 0){
+		func_list << func_name.str();
+		key++;
+	  }
+	  else{
+		func_list << "," << func_name.str();
+	  }
 	}
-	sort(&target_data.at(x_start), &target_data.at( target_data.size()-1 ), 
-		 [](const points& lhs, const points& rhs)->bool
-		 { return lhs.x_pos < rhs.x_pos; });
-
-	cerr << "sortしたの？" << endl;
-	for (int i = 0; i < target_data.size(); i++)
-		cerr << "[" << i << "] (" << target_data.at(i).x_pos << "," << target_data.at(i).y_pos << "," << target_data.at(i).xIdx << "," << target_data.at(i).yIdx << ")" << endl;
+  }
+  //表示設定
+	  ofile << "set isosample 50" << std::endl
+			<< "set contour" << std::endl
+			<< "set cntrparam levels 2" << std::endl
+			<< "set yrange[" << min_y << ":" << max_y << "]" << std::endl
+			<< "set xrange[" << min_x << ":" << max_x << "]" << std::endl
+			<< "splot " << func_list.str() << std::endl
+			<< "unset surface" << std::endl
+			<< "unset key" << std::endl
+			<< "set view 0,0" << std::endl
+			<< "replot" << std::endl;
+  ofile.close();
 }
-
 
 //vec * mat = 1*2
 void multiVtM(double vec[2], double mat[2][2], double vec_h[2])
@@ -161,21 +206,26 @@ void estimateCovarianceMat(double mat[2][2] ,std::vector<points>& data, points m
 	mat[1][1] = a11;
 }
 
-void estimateInvMat(double inv_mat[2][2], double mat[2][2])
+bool estimateInvMat(double inv_mat[2][2], double mat[2][2])
 {
 	double delta = (mat[0][0] * mat[1][1]) - (mat[0][1] * mat[1][0]);
+	if (delta == 0){
+		cerr << "no inv mat" << endl;
+		return false;
+	}
 	inv_mat[0][0] = mat[1][1] / delta;
 	inv_mat[1][1] = mat[0][0] / delta;
 	inv_mat[0][1] = -mat[0][1] /delta;
 	inv_mat[1][0] = -mat[1][0] / delta; 
+	return true;
 }
 
-void estimateInvMat3d(double mat[3][3], double inv_mat[3][3])
+bool estimateInvMat3d(double mat[3][3], double inv_mat[3][3])
 {
 	double det = mat[0][0]*mat[1][1]*mat[2][2] + mat[0][1]*mat[1][2]*mat[2][0] + mat[0][2]*mat[1][0]*mat[2][1] - mat[0][0]*mat[1][2]*mat[2][1] - mat[0][1]*mat[1][0]*mat[2][2] - mat[0][2]*mat[1][1]*mat[2][0];
 	if (det == 0){
 		cerr << "no inv mat" << endl;
-		exit(-1);
+		return false;
 	}
 	inv_mat[0][0] = (mat[1][1]*mat[2][2] - mat[1][2]*mat[2][1]) / det;
 	inv_mat[0][1] = (mat[0][2]*mat[2][1] - mat[0][1]*mat[2][2]) / det;
@@ -186,6 +236,7 @@ void estimateInvMat3d(double mat[3][3], double inv_mat[3][3])
 	inv_mat[2][0] = (mat[1][0]*mat[2][1] - mat[1][1]*mat[2][0]) / det;
 	inv_mat[2][1] = (mat[0][1]*mat[2][0] - mat[0][0]*mat[2][1]) / det;
 	inv_mat[2][2] = (mat[0][0]*mat[1][1] - mat[0][1]*mat[1][0]) / det;
+	return true;
 }
 
 double estimateProb(points pt, double inv_mat[2][2], points mean_pt)
@@ -260,7 +311,7 @@ void estimateVecG(points pt, double transform_param[3], points mean_pt, double c
   transformPoint(pt, transform_param[2], transform_param[0], transform_param[1], pt_transformed);
   points pt_relative;
   pt_relative.x_pos = pt_transformed.x_pos - mean_pt.x_pos;
-  pt_relative.x_pos = pt_transformed.y_pos - mean_pt.y_pos;
+  pt_relative.y_pos = pt_transformed.y_pos - mean_pt.y_pos;
 
   //jacov
   double jacov[3][2];
@@ -287,7 +338,7 @@ void estimateMatH(points pt, double transform_param[3], points mean_pt, double c
   transformPoint(pt, transform_param[2], transform_param[0], transform_param[1], pt_transformed);
   points pt_relative;
   pt_relative.x_pos = pt_transformed.x_pos - mean_pt.x_pos;
-  pt_relative.x_pos = pt_transformed.y_pos - mean_pt.y_pos;
+  pt_relative.y_pos = pt_transformed.y_pos - mean_pt.y_pos;
 
   //jacov
   double jacov[3][2];
@@ -319,15 +370,16 @@ void estimateMatH(points pt, double transform_param[3], points mean_pt, double c
   }
 
   //debug用表示
-  std::cerr << ">>>hesse calc..." << std::endl;
-  std::cerr << "pt: (" << pt.x_pos << ", " << pt.y_pos << ")" << std::endl;
-  std::cerr << "pt_trans: (" << pt_transformed.x_pos << ", " << pt_transformed.y_pos << ")" << std::endl;
-  std::cerr << "pt_relative: (" << pt_relative.x_pos << ", " << pt_relative.y_pos << ")" << std::endl;
-  std::cerr << "mean pt: (" << mean_pt.x_pos << ", " << mean_pt.y_pos << ")" << std::endl;
-  std::cerr << "jacov[0]: (" << jacov[0][0] << ", " << jacov[0][1] << ")" << std::endl;
-  std::cerr << "jacov[1]: (" << jacov[1][0] << ", " << jacov[1][1] << ")" << std::endl;
-  std::cerr << "jacov[2]: (" << jacov[2][0] << ", " << jacov[2][1] << ")" << std::endl;
-  std::cerr << "exp content:" << contents << std::endl;
+  // std::cerr << std::endl << ">>>hesse calc..." << std::endl;
+  // std::cerr << "pt: (" << pt.x_pos << ", " << pt.y_pos << ")" << std::endl;
+  // std::cerr << "param: (" << transform_param[0] << ", " << transform_param[1] << ", " << transform_param[2] << ")" << std::endl;
+  // std::cerr << "pt_trans: (" << pt_transformed.x_pos << ", " << pt_transformed.y_pos << ")" << std::endl;
+  // std::cerr << "mean pt: (" << mean_pt.x_pos << ", " << mean_pt.y_pos << ")" << std::endl;
+  // std::cerr << "pt_relative: (" << pt_relative.x_pos << ", " << pt_relative.y_pos << ")" << std::endl;
+  // std::cerr << "jacov[0]: (" << jacov[0][0] << ", " << jacov[0][1] << ")" << std::endl;
+  // std::cerr << "jacov[1]: (" << jacov[1][0] << ", " << jacov[1][1] << ")" << std::endl;
+  // std::cerr << "jacov[2]: (" << jacov[2][0] << ", " << jacov[2][1] << ")" << std::endl;
+  // std::cerr << "exp content:" << contents << std::endl << std::endl;
 
 }
 
@@ -386,8 +438,9 @@ bool determineDefinite(double mat[3][3], double rambda)
 void estimateTransform(std::vector<points>& target_local, std::vector<points>& input_local, double param[DIM+1], double tolerance, int max_cicle, double score)
 {
 	//平均を求めるお(target)
-	points mean_pt;
+    points mean_pt, mean_pt2;
 	estimateMean(mean_pt, target_local);
+	estimateMean(mean_pt2, target_local);
 	cerr << "mean pt: " << mean_pt.x_pos << ", " << mean_pt.y_pos << std::endl;
 
 	//共分散行列を求めるお(target)
@@ -403,7 +456,7 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 
 	//共分散行列の逆行列を求めるお(target)
 	double inv_cov_mat[DIM][DIM];
-	estimateInvMat(inv_cov_mat, mat);
+	while( estimateInvMat(inv_cov_mat, mat) ){
 	cerr << "inv cov mat:" << endl;
 	for(int i = 0; i < 2; i++){
 		for(int j = 0; j < 2; j++){
@@ -417,8 +470,8 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 
 	if (input_local.size() <= 3){
 	  cerr << " entry few points cource..." << endl;
-	  for (int i = 0; i < DIM+1; i++)
-		param[i] = 999;
+	  // for (int i = 0; i < DIM+1; i++)
+	  // 	param[i] = 999;
 	  score = -999;
 	}
 
@@ -437,7 +490,7 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 		  
 		  //estimate H
 		  double mat_h[3][3];
-		  estimateMatH(input_local.at(index), param, mean_pt, inv_cov_mat, mat_h);
+		  estimateMatH(input_local.at(index), param, mean_pt2, inv_cov_mat, mat_h);
 		  //add H
 		  for(int i = 0; i < 3; i++){
 			for (int j = 0; j < 3; j++)
@@ -466,12 +519,6 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 			std::cerr << std::endl;
 		}
 		
-		// if(-tolerance < g_local[0] && g_local[0] <tolerance)
-		//   if(-tolerance < g_local[1] && g_local[1] <tolerance){
-		// 	std::cerr << "tolerance clear g = (" << g_local[0] << ", " << g_local[1] << ")" << std::endl;
-		// 	break;
-		//   }
-		
 		double inv_h[3][3];
 		estimateInvMat3d(h_local, inv_h);
 		//bool definite = determineDefinite(inv_h);
@@ -491,5 +538,6 @@ void estimateTransform(std::vector<points>& target_local, std::vector<points>& i
 		if(i == max_cicle - 1)
 		  std::cerr << "converged!!(" << max_cicle << ")" << std::endl;
 	  }		
+	}
 	}
 }

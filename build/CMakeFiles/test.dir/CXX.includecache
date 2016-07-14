@@ -6,14 +6,20 @@
 
 #IncludeRegexTransform: 
 
-/home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp
+/home/shuhei/Documents/ndt_test/scripts/main.cpp
 ndt_test.h
 /home/shuhei/Documents/ndt_test/scripts/ndt_test.h
+iostream
+-
+fstream
+-
 
 /home/shuhei/Documents/ndt_test/scripts/ndt_test.h
 iostream
 -
 fstream
+-
+sstream
 -
 boost/tokenizer.hpp
 -
