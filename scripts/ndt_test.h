@@ -41,6 +41,10 @@ double multiVtV(double vec_h[DIM], double vec_v[DIM]);
 bool estimateInvMat(double inv_mat[DIM][DIM], double mat[DIM][DIM]);
 bool estimateInvMat3d(double mat[DIM+1][DIM+1], double inv_mat[DIM+1][DIM+1]);
 
+//男もすなる固有値とやらを女のアユゲも...
+int estimateEigenValue(int n, int ct, double eps, double A[3][3], double A1[3][3], double A2[3][3],
+					   double X1[3][3], double X2[3][3]);
+
 //複数のポイントの重心を求める
 void estimateMean(points& mean_pt, std::vector<points>& data);
 
@@ -77,7 +81,9 @@ void estimateMatH(points pt, double transform_param[3], points mean_pt, double c
 //正定でなかったら rambda * I を足しとくよ
 bool determineDefinite(double mat[DIM+1][DIM+1], double rambda);
 
-
+//収束計算するやーつ
 void estimateTransform(std::vector<points>& target_local, std::vector<points>& input_local, double param[DIM+1], double tolerance, int max_cicle, double score);
+
+//
 
 #endif

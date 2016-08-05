@@ -166,13 +166,6 @@ int main(int argc, char** argv)
 	  Hesse[0][0] += hesse_[0][0]; Hesse[0][1] += hesse_[0][1]; Hesse[0][2] += hesse_[0][2];
 	  Hesse[1][0] += hesse_[1][0]; Hesse[1][1] += hesse_[1][1]; Hesse[1][2] += hesse_[1][2];
 	  Hesse[2][0] += hesse_[2][0]; Hesse[2][1] += hesse_[2][1]; Hesse[2][2] += hesse_[2][2];
-	  // std::cerr << "  hesse:" << std::endl;
-	  // for(int a = 0; a < 3; a++){
-	  // 	for(int b = 0; b < 3; b++){
-	  // 	  std::cerr << Hesse[a][b] << " "; 
-	  // 	}
-	  // 	std::cerr<< std::endl;
-	  // }
 
 	  //スコア求めておこうよ
 	  double score_ = estimateProb(pt_transformed, inv_cov, grid_mean);
@@ -180,6 +173,29 @@ int main(int argc, char** argv)
 	}
 
 	//delta_pを求める
+	//Hesseの固有値がなんたら
+	int dev = 3;
+	double A1[dev][dev], A2[dev][dev], X1[dev][dev], X2[dev][dev];
+	int test_eigen = estimateEigenValue(dev, //次数
+										10, //最大繰り返し
+										1e-10, //eps
+										Hesse, //対象行列
+										A1, //固有値が入るよ
+										A2,
+										X1, //固有ベクトルがあるよ
+										X2);
+
+	double min_eigen_value = DBL_MAX;
+	for(int d = 0; d < dev; d++){
+	  if(A1[d][d] < min_eigen_value)
+		min_eigen_value = A1[d][d];
+	}
+	if(min_eigen_value < 0){
+	  double lambda = 1 - 1.1 * min_eigen_value;
+	  for(int d = 0; d < dev; d++)
+		Hesse[d][d] += lambda;
+	}
+
 	//Hesseの逆行列
 	double inv_Hesse[3][3];
 	if( estimateInvMat3d(Hesse, inv_Hesse) ){
