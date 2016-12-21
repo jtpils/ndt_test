@@ -1,4 +1,10 @@
-*~
-*.pcd
+MakeFiles/
+build/
+*.bag
 *.csv
-
+# *.pcd
+# !data/bunny.pcd
+*.pcap
+*.exe
+*~
+core

@@ -38,19 +38,22 @@ RM = /usr/bin/cmake -E remove -f
 # Escaping for special characters.
 EQUALS = =
 
+# The program to use to edit the cache.
+CMAKE_EDIT_COMMAND = /usr/bin/cmake-gui
+
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/shuhei/Documents/ndt_test/build
+CMAKE_SOURCE_DIR = /home/shuhei/Documents/demo/ndt_test
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/shuhei/Documents/ndt_test/build
+CMAKE_BINARY_DIR = /home/shuhei/Documents/demo/ndt_test/build
 
 #=============================================================================
 # Targets provided globally by CMake.
 
 # Special rule for the target edit_cache
 edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running interactive CMake command-line interface..."
-	/usr/bin/cmake -i .
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
+	/usr/bin/cmake-gui -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -69,9 +72,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/shuhei/Documents/ndt_test/build/CMakeFiles /home/shuhei/Documents/ndt_test/build/CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/shuhei/Documents/demo/ndt_test/build/CMakeFiles /home/shuhei/Documents/demo/ndt_test/build/CMakeFiles/progress.marks
 	$(MAKE) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/shuhei/Documents/ndt_test/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/shuhei/Documents/demo/ndt_test/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -99,89 +102,65 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named test
+# Target rules for targets named pose_test
 
 # Build rule for target.
-test: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test
-.PHONY : test
+pose_test: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 pose_test
+.PHONY : pose_test
 
 # fast build rule for target.
-test/fast:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/build
-.PHONY : test/fast
+pose_test/fast:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/build
+.PHONY : pose_test/fast
 
-home/shuhei/Documents/ndt_test/scripts/PSO.o: home/shuhei/Documents/ndt_test/scripts/PSO.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.o
-
-# target to build an object file
-home/shuhei/Documents/ndt_test/scripts/PSO.cpp.o:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/PSO.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.cpp.o
-
-home/shuhei/Documents/ndt_test/scripts/PSO.i: home/shuhei/Documents/ndt_test/scripts/PSO.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.i
-
-# target to preprocess a source file
-home/shuhei/Documents/ndt_test/scripts/PSO.cpp.i:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/PSO.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.cpp.i
-
-home/shuhei/Documents/ndt_test/scripts/PSO.s: home/shuhei/Documents/ndt_test/scripts/PSO.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.s
-
-# target to generate assembly for a file
-home/shuhei/Documents/ndt_test/scripts/PSO.cpp.s:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/PSO.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/PSO.cpp.s
-
-home/shuhei/Documents/ndt_test/scripts/main.o: home/shuhei/Documents/ndt_test/scripts/main.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.o
+src/main.o: src/main.cpp.o
+.PHONY : src/main.o
 
 # target to build an object file
-home/shuhei/Documents/ndt_test/scripts/main.cpp.o:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/main.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.cpp.o
+src/main.cpp.o:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/main.cpp.o
+.PHONY : src/main.cpp.o
 
-home/shuhei/Documents/ndt_test/scripts/main.i: home/shuhei/Documents/ndt_test/scripts/main.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.i
+src/main.i: src/main.cpp.i
+.PHONY : src/main.i
 
 # target to preprocess a source file
-home/shuhei/Documents/ndt_test/scripts/main.cpp.i:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/main.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.cpp.i
+src/main.cpp.i:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/main.cpp.i
+.PHONY : src/main.cpp.i
 
-home/shuhei/Documents/ndt_test/scripts/main.s: home/shuhei/Documents/ndt_test/scripts/main.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.s
+src/main.s: src/main.cpp.s
+.PHONY : src/main.s
 
 # target to generate assembly for a file
-home/shuhei/Documents/ndt_test/scripts/main.cpp.s:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/main.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/main.cpp.s
+src/main.cpp.s:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/main.cpp.s
+.PHONY : src/main.cpp.s
 
-home/shuhei/Documents/ndt_test/scripts/ndt_test.o: home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.o
+src/ndt_test.o: src/ndt_test.cpp.o
+.PHONY : src/ndt_test.o
 
 # target to build an object file
-home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.o:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.o
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.o
+src/ndt_test.cpp.o:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/ndt_test.cpp.o
+.PHONY : src/ndt_test.cpp.o
 
-home/shuhei/Documents/ndt_test/scripts/ndt_test.i: home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.i
+src/ndt_test.i: src/ndt_test.cpp.i
+.PHONY : src/ndt_test.i
 
 # target to preprocess a source file
-home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.i:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.i
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.i
+src/ndt_test.cpp.i:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/ndt_test.cpp.i
+.PHONY : src/ndt_test.cpp.i
 
-home/shuhei/Documents/ndt_test/scripts/ndt_test.s: home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.s
+src/ndt_test.s: src/ndt_test.cpp.s
+.PHONY : src/ndt_test.s
 
 # target to generate assembly for a file
-home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.s:
-	$(MAKE) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.s
-.PHONY : home/shuhei/Documents/ndt_test/scripts/ndt_test.cpp.s
+src/ndt_test.cpp.s:
+	$(MAKE) -f CMakeFiles/pose_test.dir/build.make CMakeFiles/pose_test.dir/src/ndt_test.cpp.s
+.PHONY : src/ndt_test.cpp.s
 
 # Help Target
 help:
@@ -190,17 +169,14 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... edit_cache"
+	@echo "... pose_test"
 	@echo "... rebuild_cache"
-	@echo "... test"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/PSO.o"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/PSO.i"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/PSO.s"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/main.o"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/main.i"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/main.s"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/ndt_test.o"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/ndt_test.i"
-	@echo "... home/shuhei/Documents/ndt_test/scripts/ndt_test.s"
+	@echo "... src/main.o"
+	@echo "... src/main.i"
+	@echo "... src/main.s"
+	@echo "... src/ndt_test.o"
+	@echo "... src/ndt_test.i"
+	@echo "... src/ndt_test.s"
 .PHONY : help
 
 
